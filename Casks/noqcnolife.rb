@@ -1,6 +1,6 @@
 cask "noqcnolife" do
-  version "1.3.1"
-  sha256 "0be16bfaa5fa8fee4709a438110e0e6ed76af4a3b84d8e034f6218b3aa293d3d"
+  version "1.4.0"
+  sha256 "b1b6736f1a68d414b6b49cb185d2fe43062f333ec42bdb795537358c41c741d5"
 
   url "https://github.com/balcsida/NoQCNoLife/releases/download/v#{version}/NoQCNoLife-#{version}.dmg"
   name "No QC, No Life"
