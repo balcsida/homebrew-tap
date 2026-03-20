@@ -1,6 +1,6 @@
-# Homebrew Tap for balcsida
+# Homebrew Tap
 
-This tap contains Homebrew formulas for my projects.
+Homebrew tap for my macOS applications.
 
 ## Installation
 
@@ -8,28 +8,48 @@ This tap contains Homebrew formulas for my projects.
 brew tap balcsida/tap
 ```
 
-## Available Formulas
+## Available Casks
+
+### Brain.fm
+
+Native macOS menu bar app for Brain.fm focus music.
+
+```bash
+brew install brainfm
+```
+
+- [Brain.fm Repository](https://github.com/balcsida/brainfm-swift)
 
 ### NoQCNoLife
 
 Control Bose QuietComfort headphones from macOS.
 
 ```bash
-brew install --cask balcsida/tap/noqcnolife
+brew install noqcnolife
 ```
 
-Or simply:
+- [NoQCNoLife Repository](https://github.com/balcsida/NoQCNoLife)
+
+### ANYK
+
+Hungarian Tax Authority (NAV) form filler application for macOS.
+
 ```bash
-brew install --cask noqcnolife  # after tapping
+brew install anyk
 ```
+
+550+ NAV form templates are also available:
+
+```bash
+brew search balcsida/tap/anyk-
+brew install anyk-25szja
+```
+
+- [ANYK Details](https://github.com/balcsida/homebrew-anyk)
 
 ## Uninstallation
 
 ```bash
-brew uninstall --cask noqcnolife
+brew uninstall --cask <cask-name>
 brew untap balcsida/tap
 ```
-
-## More Information
-
-- [NoQCNoLife Repository](https://github.com/balcsida/NoQCNoLife)

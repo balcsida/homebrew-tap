@@ -1,0 +1,73 @@
+name: Update Brain.fm Cask
+
+on:
+  repository_dispatch:
+    types: [update-brainfm]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (without v prefix, e.g. 1.0.0)'
+        required: false
+        type: string
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version and SHA
+        id: info
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+            SHA256="${{ github.event.client_payload.sha256 }}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          fi
+
+          # If no version provided, fetch latest release
+          if [ -z "${VERSION:-}" ]; then
+            VERSION=$(gh api repos/balcsida/brainfm-swift/releases/latest -q '.tag_name' | sed 's/^v//')
+          fi
+
+          # If no SHA provided, download and compute it
+          if [ -z "${SHA256:-}" ]; then
+            DMG_URL="https://github.com/balcsida/brainfm-swift/releases/download/v${VERSION}/BrainFM-${VERSION}-arm64.dmg"
+            curl -sL -o brainfm.dmg "$DMG_URL"
+            SHA256=$(shasum -a 256 brainfm.dmg | awk '{print $1}')
+            rm brainfm.dmg
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+
+      - name: Update cask
+        run: |
+          VERSION="${{ steps.info.outputs.version }}"
+          SHA256="${{ steps.info.outputs.sha256 }}"
+
+          sed -i "s/version \".*\"/version \"${VERSION}\"/" Casks/brainfm.rb
+          sed -i "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Casks/brainfm.rb
+
+          echo "Updated Casks/brainfm.rb:"
+          cat Casks/brainfm.rb
+
+      - name: Commit and push
+        run: |
+          VERSION="${{ steps.info.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/brainfm.rb
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update Brain.fm to v${VERSION}"
+            git push
+          fi
