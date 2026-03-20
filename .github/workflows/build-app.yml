@@ -1,0 +1,338 @@
+name: Build ÁNYK App Bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for the release (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      create_release:
+        description: 'Create a GitHub release'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download ÁNYK installer
+        run: |
+          curl -sL -o abevjava_install.jar \
+            "https://nav.gov.hu/pfile/programFile?path=/nyomtatvanyok/letoltesek/nyomtatvanykitolto_programok/nyomtatvany_apeh/keretprogramok/AbevJava"
+          echo "Downloaded ÁNYK installer: $(ls -lh abevjava_install.jar)"
+
+      - name: Extract ÁNYK application files
+        run: |
+          unzip -o -q abevjava_install.jar "application/*" -d .
+          unzip -o -q abevjava_install.jar "os/install/mac/*" -d .
+          echo "Extracted application files:"
+          ls -la application/
+
+      - name: Download Eclipse Temurin JRE 21 (both architectures)
+        run: |
+          # Download ARM64 JRE
+          echo "Downloading ARM64 JRE..."
+          curl -sL -o jre-arm64.tar.gz \
+            "https://api.adoptium.net/v3/binary/latest/21/ga/mac/aarch64/jre/hotspot/normal/eclipse"
+          mkdir -p jre-arm64
+          tar -xzf jre-arm64.tar.gz -C jre-arm64 --strip-components=1
+          echo "ARM64 JRE: $(ls jre-arm64/)"
+
+          # Download x64 JRE
+          echo "Downloading x64 JRE..."
+          curl -sL -o jre-x64.tar.gz \
+            "https://api.adoptium.net/v3/binary/latest/21/ga/mac/x64/jre/hotspot/normal/eclipse"
+          mkdir -p jre-x64
+          tar -xzf jre-x64.tar.gz -C jre-x64 --strip-components=1
+          echo "x64 JRE: $(ls jre-x64/)"
+
+      - name: Download JAXB dependencies
+        run: |
+          mkdir -p lib
+          curl -sL -o lib/jakarta.xml.bind-api-2.3.3.jar \
+            "https://repo1.maven.org/maven2/jakarta/xml/bind/jakarta.xml.bind-api/2.3.3/jakarta.xml.bind-api-2.3.3.jar"
+          curl -sL -o lib/jaxb-runtime-2.3.3.jar \
+            "https://repo1.maven.org/maven2/org/glassfish/jaxb/jaxb-runtime/2.3.3/jaxb-runtime-2.3.3.jar"
+          curl -sL -o lib/jakarta.activation-api-1.2.2.jar \
+            "https://repo1.maven.org/maven2/jakarta/activation/jakarta.activation-api/1.2.2/jakarta.activation-api-1.2.2.jar"
+          curl -sL -o lib/istack-commons-runtime-3.0.11.jar \
+            "https://repo1.maven.org/maven2/com/sun/istack/istack-commons-runtime/3.0.11/istack-commons-runtime-3.0.11.jar"
+          curl -sL -o lib/jakarta.activation-1.2.2.jar \
+            "https://repo1.maven.org/maven2/com/sun/activation/jakarta.activation/1.2.2/jakarta.activation-1.2.2.jar"
+          echo "Downloaded JAXB libs:"
+          ls -la lib/
+
+      - name: Download and extract NAV form templates
+        run: |
+          mkdir -p templates
+
+          # Template definitions: folder|filename
+          TEMPLATES="igazol|NAV_igazol
+          08E|nav_08e
+          24HIPAK|nav_24hipak
+          2541|nav_2541
+          25HIPAK|nav_25hipak
+          2658|nav_2658
+          26HIPAK|nav_26hipak
+          26KISKER|nav_26kisker
+          26KTBEV|nav_26ktbev
+          NAV_J28|NAV_nav_j28
+          NAV_J31|NAV_nav_j31
+          NAV_J32|NAV_j32
+          nav_j24|NAV_j24"
+
+          echo "$TEMPLATES" | while IFS='|' read -r folder filename; do
+            echo "Downloading template: $folder/$filename"
+            curl -sL -o "templates/${filename}.jar" \
+              "https://nav.gov.hu/pfile/programFile?path=/nyomtatvanyok/letoltesek/nyomtatvanykitolto_programok/nyomtatvanykitolto_programok_nav/${folder}/${filename}"
+
+            # Extract template files
+            unzip -o -q "templates/${filename}.jar" "application/*" -d templates/ 2>/dev/null || true
+          done
+
+          # List extracted templates
+          echo "Extracted templates:"
+          find templates/application -name "*.tem.enyk" 2>/dev/null | head -20 || echo "No templates found"
+
+      - name: Create universal app bundle
+        run: |
+          APP_NAME="ANYK.app"
+          mkdir -p "$APP_NAME/Contents/MacOS"
+          mkdir -p "$APP_NAME/Contents/Resources"
+          mkdir -p "$APP_NAME/Contents/Java"
+          mkdir -p "$APP_NAME/Contents/Java/lib"
+          mkdir -p "$APP_NAME/Contents/PlugIns/jre-arm64"
+          mkdir -p "$APP_NAME/Contents/PlugIns/jre-x64"
+
+          # Copy ÁNYK application files
+          cp -r application/* "$APP_NAME/Contents/Java/"
+
+          # Copy JAXB libs
+          cp lib/*.jar "$APP_NAME/Contents/Java/lib/"
+
+          # Copy both JREs
+          cp -r jre-arm64/* "$APP_NAME/Contents/PlugIns/jre-arm64/"
+          cp -r jre-x64/* "$APP_NAME/Contents/PlugIns/jre-x64/"
+
+          # Copy icon
+          cp os/install/mac/abevjava.app/Contents/Resources/abevjava.icns "$APP_NAME/Contents/Resources/anyk.icns"
+
+          # Copy extracted template files
+          if [ -d "templates/application" ]; then
+            cp -r templates/application/* "$APP_NAME/Contents/Java/"
+          fi
+
+          # List included templates
+          echo "Included templates:"
+          ls -la "$APP_NAME/Contents/Java/nyomtatvanyok/" 2>/dev/null | head -20 || echo "No templates found"
+
+          # Show bundle size
+          echo "App bundle size:"
+          du -sh "$APP_NAME"
+
+      - name: Create Info.plist
+        run: |
+          APP_NAME="ANYK.app"
+          cat > "$APP_NAME/Contents/Info.plist" << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleDevelopmentRegion</key>
+            <string>Hungarian</string>
+            <key>CFBundleExecutable</key>
+            <string>anyk</string>
+            <key>CFBundleIconFile</key>
+            <string>anyk</string>
+            <key>CFBundleIdentifier</key>
+            <string>hu.gov.nav.anyk</string>
+            <key>CFBundleName</key>
+            <string>ANYK</string>
+            <key>CFBundleDisplayName</key>
+            <string>ANYK - NAV Form Filler</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleVersion</key>
+            <string>1.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+            <key>NSSupportsAutomaticGraphicsSwitching</key>
+            <true/>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.13</string>
+            <key>LSArchitecturePriority</key>
+            <array>
+              <string>arm64</string>
+              <string>x86_64</string>
+            </array>
+          </dict>
+          </plist>
+          PLIST
+
+      - name: Create universal launcher script
+        run: |
+          APP_NAME="ANYK.app"
+          cat > "$APP_NAME/Contents/MacOS/anyk" << 'LAUNCHER'
+          #!/bin/bash
+
+          # Get the directory where the app bundle is located
+          APP_DIR="$(cd "$(dirname "$0")/../.."; pwd)"
+          ANYK_HOME="$APP_DIR/Contents/Java"
+          ANYK_LIB="$ANYK_HOME/lib"
+
+          # Detect architecture and select appropriate JRE
+          ARCH="$(uname -m)"
+          if [ "$ARCH" = "arm64" ]; then
+            JAVA_HOME="$APP_DIR/Contents/PlugIns/jre-arm64/Contents/Home"
+          else
+            JAVA_HOME="$APP_DIR/Contents/PlugIns/jre-x64/Contents/Home"
+          fi
+
+          # User directories
+          USER_HOME="$HOME"
+          USERNAME="$(whoami)"
+          USER_CONFIG_DIR="$USER_HOME/.abevjava"
+          USER_CONFIG="$USER_CONFIG_DIR/$USERNAME.enyk"
+          USER_DATA_DIR="$USER_HOME/abevjava"
+
+          # JAXB classpath for Java 21 compatibility
+          JAXB_CLASSPATH="$ANYK_LIB/jakarta.xml.bind-api-2.3.3.jar:$ANYK_LIB/jaxb-runtime-2.3.3.jar:$ANYK_LIB/jakarta.activation-api-1.2.2.jar:$ANYK_LIB/jakarta.activation-1.2.2.jar:$ANYK_LIB/istack-commons-runtime-3.0.11.jar"
+
+          # Create user directories if they don't exist
+          mkdir -p "$USER_CONFIG_DIR"
+          mkdir -p "$USER_DATA_DIR"/{mentesek,archivum,import,beallitasok,kontroll,csatolmanyok,tmp,naplo,frissitesek,torzsadatok,eKuldes}
+          mkdir -p "$USER_DATA_DIR/KR"/{digitalis_alairas,kuldendo,elkuldott}
+
+          # Create user config if it doesn't exist
+          if [ ! -f "$USER_CONFIG" ]; then
+            cat > "$USER_CONFIG" << ENYK
+          prop.usr.root=$USER_DATA_DIR
+          prop.usr.saves=mentesek
+          prop.usr.archive=archivum
+          prop.usr.import=import
+          prop.usr.settings=beallitasok
+          prop.usr.kontroll=kontroll
+          prop.usr.attachment=csatolmanyok
+          prop.usr.tmp=tmp
+          prop.usr.tmp_xml=xml
+          prop.usr.tmp_calc=calc
+          prop.usr.ds_src=KR/digitalis_alairas
+          prop.usr.ds_dest=KR/kuldendo
+          prop.usr.ds_sent=KR/elkuldott
+          ENYK
+          fi
+
+          # Set KRDIR environment variable for electronic submission
+          export KRDIR="$USER_DATA_DIR/eKuldes"
+
+          # Run ÁNYK with embedded Java 21
+          cd "$ANYK_HOME"
+          exec "$JAVA_HOME/bin/java" \
+            --add-opens java.base/java.lang=ALL-UNNAMED \
+            --add-opens java.desktop/sun.awt=ALL-UNNAMED \
+            -Xbootclasspath/a:"$JAXB_CLASSPATH" \
+            -Xdock:name="ANYK" \
+            -Xdock:icon="$APP_DIR/Contents/Resources/anyk.icns" \
+            -jar "$ANYK_HOME/abevjava.jar" cfg=cfg.enyk "useroptionfile=$USER_CONFIG"
+          LAUNCHER
+          chmod +x "$APP_NAME/Contents/MacOS/anyk"
+
+      - name: Create DMG
+        run: |
+          VERSION="${{ inputs.version }}"
+          DMG_NAME="ANYK-${VERSION}-universal.dmg"
+
+          # Create a temporary directory for DMG contents
+          mkdir -p dmg_contents
+          cp -r "ANYK.app" dmg_contents/
+
+          # Create a symlink to Applications
+          ln -s /Applications dmg_contents/Applications
+
+          # Create DMG
+          hdiutil create -volname "ANYK" -srcfolder dmg_contents -ov -format UDZO "$DMG_NAME"
+
+          echo "Created DMG: $DMG_NAME"
+          ls -lh "$DMG_NAME"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ANYK-universal
+          path: "*.dmg"
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ inputs.create_release }}
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ANYK-universal
+          path: artifacts
+
+      - name: List artifacts
+        run: |
+          echo "Downloaded artifacts:"
+          ls -la artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version }}
+          name: "ÁNYK ${{ inputs.version }}"
+          body: |
+            ## ÁNYK Standalone App Bundle
+
+            This release contains a **universal** standalone `.app` bundle for macOS with embedded Java 21 runtime.
+            Works on both Apple Silicon and Intel Macs. No Homebrew or separate Java installation required.
+
+            ### Download
+
+            - **Universal (Intel + Apple Silicon)**: `ANYK-${{ inputs.version }}-universal.dmg`
+
+            ### Installation
+
+            1. Download the DMG file
+            2. Open the DMG file
+            3. Drag ÁNYK to your Applications folder
+            4. Right-click and select "Open" (first time only, to bypass Gatekeeper)
+
+            ### Features
+
+            - **Universal binary** - works on both Intel and Apple Silicon Macs
+            - HiDPI/Retina display support
+            - Embedded Java 21 runtime
+            - **All NAV form templates included** (no separate download needed)
+            - No external dependencies required
+
+            ### Included Templates
+
+            - NAV IGAZOL (certificate request)
+            - NAV 08E, 2541, 2658
+            - NAV 24HIPAK, 25HIPAK, 26HIPAK
+            - NAV 26KISKER, 26KTBEV
+            - NAV J24, J28, J31, J32
+
+            ### User Data
+
+            - User data is stored in: `~/abevjava`
+            - Electronic submissions: `~/abevjava/eKuldes`
+            - Configuration: `~/.abevjava/`
+          files: artifacts/*.dmg
+          draft: false
+          prerelease: false
+          make_latest: true
