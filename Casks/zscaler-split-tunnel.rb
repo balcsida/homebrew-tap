@@ -1,6 +1,6 @@
 cask "zscaler-split-tunnel" do
-  version "1.0.0"
-  sha256 "7f5314e9c1f626bbcad1647ada2d8de0e3148221fbc02fda8f6fe3ee518307ba"
+  version "1.1.0"
+  sha256 "11325008b7ac8511583310729391ca116cf3ea2bd62e7f8d088b757e21b295ff"
 
   url "https://github.com/balcsida/zscaler-split-tunnel/releases/download/v#{version}/ZscalerSplitTunnel-#{version}.dmg"
   name "Zscaler Split Tunnel"
