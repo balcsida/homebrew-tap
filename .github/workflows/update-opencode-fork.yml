@@ -1,0 +1,118 @@
+name: Update opencode-fork Formula
+
+on:
+  repository_dispatch:
+    types: [update-opencode-fork]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without v prefix (e.g. 1.14.29)'
+        required: false
+        type: string
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Determine version and SHAs
+        id: info
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+            SHA256_ARM64="${{ github.event.client_payload.sha256_arm64 }}"
+            SHA256_X64="${{ github.event.client_payload.sha256_x64 }}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          fi
+
+          # If no version provided, fetch latest release from fork
+          if [ -z "${VERSION:-}" ]; then
+            VERSION=$(gh api repos/anomalyco/opencode/releases/latest -q '.tag_name' | sed 's/^v//')
+          fi
+
+          # If no SHAs provided, download and compute them
+          if [ -z "${SHA256_ARM64:-}" ]; then
+            curl -sL "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/opencode-darwin-arm64.zip" \
+              -o opencode-arm64.zip
+            SHA256_ARM64=$(shasum -a 256 opencode-arm64.zip | awk '{print $1}')
+            rm opencode-arm64.zip
+          fi
+
+          if [ -z "${SHA256_X64:-}" ]; then
+            curl -sL "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/opencode-darwin-x64.zip" \
+              -o opencode-x64.zip
+            SHA256_X64=$(shasum -a 256 opencode-x64.zip | awk '{print $1}')
+            rm opencode-x64.zip
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "sha256_arm64=$SHA256_ARM64" >> $GITHUB_OUTPUT
+          echo "sha256_x64=$SHA256_X64" >> $GITHUB_OUTPUT
+
+      - name: Update formula
+        run: |
+          VERSION="${{ steps.info.outputs.version }}"
+          SHA256_ARM64="${{ steps.info.outputs.sha256_arm64 }}"
+          SHA256_X64="${{ steps.info.outputs.sha256_x64 }}"
+          FORMULA="Formula/opencode-fork.rb"
+
+          sed -i "s/version \".*\"/version \"${VERSION}\"/" "$FORMULA"
+
+          # Update arm64 sha256 (first occurrence after on_arm block)
+          python3 - <<'EOF'
+          import re, os, sys
+
+          formula = os.environ.get('FORMULA', 'Formula/opencode-fork.rb')
+          arm64_sha = os.environ.get('SHA256_ARM64', '')
+          x64_sha = os.environ.get('SHA256_X64', '')
+
+          with open(formula) as f:
+              content = f.read()
+
+          # Replace sha256 inside on_arm block
+          content = re.sub(
+              r'(on_arm\s+do.*?sha256 ")([a-f0-9]{64})(")',
+              lambda m: m.group(1) + arm64_sha + m.group(3),
+              content,
+              flags=re.DOTALL,
+          )
+
+          # Replace sha256 inside on_intel block
+          content = re.sub(
+              r'(on_intel\s+do.*?sha256 ")([a-f0-9]{64})(")',
+              lambda m: m.group(1) + x64_sha + m.group(3),
+              content,
+              flags=re.DOTALL,
+          )
+
+          with open(formula, 'w') as f:
+              f.write(content)
+
+          print("Updated formula:")
+          print(content)
+          EOF
+        env:
+          FORMULA: Formula/opencode-fork.rb
+          SHA256_ARM64: ${{ steps.info.outputs.sha256_arm64 }}
+          SHA256_X64: ${{ steps.info.outputs.sha256_x64 }}
+
+      - name: Commit and push
+        run: |
+          VERSION="${{ steps.info.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/opencode-fork.rb
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update opencode-fork to v${VERSION}"
+            git push
+          fi
