@@ -1,0 +1,104 @@
+name: Update opencode-fork Formula
+
+on:
+  repository_dispatch:
+    types: [update-opencode-fork]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without v prefix (e.g. 1.14.29)'
+        required: false
+        type: string
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Determine version and SHAs
+        id: info
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
+          PAYLOAD_SHA256_ARM64: ${{ github.event.client_payload.sha256_arm64 }}
+          PAYLOAD_SHA256_X64: ${{ github.event.client_payload.sha256_x64 }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION="${PAYLOAD_VERSION:-$INPUT_VERSION}"
+          SHA256_ARM64="${PAYLOAD_SHA256_ARM64:-}"
+          SHA256_X64="${PAYLOAD_SHA256_X64:-}"
+
+          if [ -z "$VERSION" ]; then
+            VERSION=$(gh api repos/balcsida/opencode/releases/latest -q '.tag_name' | sed 's/^v//')
+          fi
+
+          fetch_sha() {
+            local arch="$1"
+            curl -fsSL "https://github.com/balcsida/opencode/releases/download/v${VERSION}/opencode-darwin-${arch}.zip" \
+              | shasum -a 256 | awk '{print $1}'
+          }
+
+          [ -n "$SHA256_ARM64" ] || SHA256_ARM64=$(fetch_sha arm64)
+          [ -n "$SHA256_X64" ]   || SHA256_X64=$(fetch_sha x64)
+
+          {
+            echo "version=$VERSION"
+            echo "sha256_arm64=$SHA256_ARM64"
+            echo "sha256_x64=$SHA256_X64"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Update formula
+        env:
+          FORMULA: Formula/opencode-fork.rb
+          VERSION: ${{ steps.info.outputs.version }}
+          SHA256_ARM64: ${{ steps.info.outputs.sha256_arm64 }}
+          SHA256_X64: ${{ steps.info.outputs.sha256_x64 }}
+        run: |
+          set -euo pipefail
+          python3 <<'EOF'
+          import os, re
+
+          formula = os.environ['FORMULA']
+          version = os.environ['VERSION']
+          arm64_sha = os.environ['SHA256_ARM64']
+          x64_sha = os.environ['SHA256_X64']
+
+          with open(formula) as f:
+              content = f.read()
+
+          content = re.sub(r'version "[^"]*"', f'version "{version}"', content, count=1)
+          content = re.sub(
+              r'(on_arm\s+do.*?sha256 ")[a-f0-9]{64}(")',
+              lambda m: f'{m.group(1)}{arm64_sha}{m.group(2)}',
+              content, count=1, flags=re.DOTALL,
+          )
+          content = re.sub(
+              r'(on_intel\s+do.*?sha256 ")[a-f0-9]{64}(")',
+              lambda m: f'{m.group(1)}{x64_sha}{m.group(2)}',
+              content, count=1, flags=re.DOTALL,
+          )
+
+          with open(formula, 'w') as f:
+              f.write(content)
+          EOF
+
+      - name: Commit and push
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/opencode-fork.rb
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update opencode-fork to v${VERSION}"
+            git push
+          fi
