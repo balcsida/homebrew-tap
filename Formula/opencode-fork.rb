@@ -1,18 +1,18 @@
 class OpencodeFork < Formula
   desc "AI-powered development tool (fork with LiteLLM provider support)"
-  homepage "https://github.com/anomalyco/opencode"
-  version "1.14.29"
+  homepage "https://github.com/balcsida/opencode"
+  version "1.14.28-litellm.2"
   license "MIT"
 
   on_macos do
     on_arm do
-      url "https://github.com/anomalyco/opencode/releases/download/v#{version}/opencode-darwin-arm64.zip"
-      sha256 "39c483fe12cffe07bfc050d59df534ca1b5d29d9232da237586f1b6a2ef1c7e1"
+      url "https://github.com/balcsida/opencode/releases/download/v#{version}/opencode-darwin-arm64.zip"
+      sha256 "a71d0976ca863e6dc8b60fb81ccaa09ab5e69a8c4dd40004781d56fe58d043c8"
     end
 
     on_intel do
-      url "https://github.com/anomalyco/opencode/releases/download/v#{version}/opencode-darwin-x64.zip"
-      sha256 "60d1c577998e5171183d55bf91e3bc699d5d91ab9998985d82240c87e2f30fec"
+      url "https://github.com/balcsida/opencode/releases/download/v#{version}/opencode-darwin-x64.zip"
+      sha256 "d2849e9cc34ec422f3ce8ba70d03518a3b18bec759aaab2292c753fbddc3f7b0"
     end
   end
 

@@ -35,12 +35,12 @@ jobs:
           SHA256_X64="${PAYLOAD_SHA256_X64:-}"
 
           if [ -z "$VERSION" ]; then
-            VERSION=$(gh api repos/anomalyco/opencode/releases/latest -q '.tag_name' | sed 's/^v//')
+            VERSION=$(gh api repos/balcsida/opencode/releases/latest -q '.tag_name' | sed 's/^v//')
           fi
 
           fetch_sha() {
             local arch="$1"
-            curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/opencode-darwin-${arch}.zip" \
+            curl -fsSL "https://github.com/balcsida/opencode/releases/download/v${VERSION}/opencode-darwin-${arch}.zip" \
               | shasum -a 256 | awk '{print $1}'
           }
 
