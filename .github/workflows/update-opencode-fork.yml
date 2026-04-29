@@ -24,89 +24,75 @@ jobs:
         id: info
         env:
           GH_TOKEN: ${{ github.token }}
+          PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
+          PAYLOAD_SHA256_ARM64: ${{ github.event.client_payload.sha256_arm64 }}
+          PAYLOAD_SHA256_X64: ${{ github.event.client_payload.sha256_x64 }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            VERSION="${{ github.event.client_payload.version }}"
-            SHA256_ARM64="${{ github.event.client_payload.sha256_arm64 }}"
-            SHA256_X64="${{ github.event.client_payload.sha256_x64 }}"
-          elif [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version }}"
-          fi
+          set -euo pipefail
+          VERSION="${PAYLOAD_VERSION:-$INPUT_VERSION}"
+          SHA256_ARM64="${PAYLOAD_SHA256_ARM64:-}"
+          SHA256_X64="${PAYLOAD_SHA256_X64:-}"
 
-          # If no version provided, fetch latest release from fork
-          if [ -z "${VERSION:-}" ]; then
+          if [ -z "$VERSION" ]; then
             VERSION=$(gh api repos/anomalyco/opencode/releases/latest -q '.tag_name' | sed 's/^v//')
           fi
 
-          # If no SHAs provided, download and compute them
-          if [ -z "${SHA256_ARM64:-}" ]; then
-            curl -sL "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/opencode-darwin-arm64.zip" \
-              -o opencode-arm64.zip
-            SHA256_ARM64=$(shasum -a 256 opencode-arm64.zip | awk '{print $1}')
-            rm opencode-arm64.zip
-          fi
+          fetch_sha() {
+            local arch="$1"
+            curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/opencode-darwin-${arch}.zip" \
+              | shasum -a 256 | awk '{print $1}'
+          }
 
-          if [ -z "${SHA256_X64:-}" ]; then
-            curl -sL "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/opencode-darwin-x64.zip" \
-              -o opencode-x64.zip
-            SHA256_X64=$(shasum -a 256 opencode-x64.zip | awk '{print $1}')
-            rm opencode-x64.zip
-          fi
+          [ -n "$SHA256_ARM64" ] || SHA256_ARM64=$(fetch_sha arm64)
+          [ -n "$SHA256_X64" ]   || SHA256_X64=$(fetch_sha x64)
 
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "sha256_arm64=$SHA256_ARM64" >> $GITHUB_OUTPUT
-          echo "sha256_x64=$SHA256_X64" >> $GITHUB_OUTPUT
+          {
+            echo "version=$VERSION"
+            echo "sha256_arm64=$SHA256_ARM64"
+            echo "sha256_x64=$SHA256_X64"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Update formula
+        env:
+          FORMULA: Formula/opencode-fork.rb
+          VERSION: ${{ steps.info.outputs.version }}
+          SHA256_ARM64: ${{ steps.info.outputs.sha256_arm64 }}
+          SHA256_X64: ${{ steps.info.outputs.sha256_x64 }}
         run: |
-          VERSION="${{ steps.info.outputs.version }}"
-          SHA256_ARM64="${{ steps.info.outputs.sha256_arm64 }}"
-          SHA256_X64="${{ steps.info.outputs.sha256_x64 }}"
-          FORMULA="Formula/opencode-fork.rb"
+          set -euo pipefail
+          python3 <<'EOF'
+          import os, re
 
-          sed -i "s/version \".*\"/version \"${VERSION}\"/" "$FORMULA"
-
-          # Update arm64 sha256 (first occurrence after on_arm block)
-          python3 - <<'EOF'
-          import re, os, sys
-
-          formula = os.environ.get('FORMULA', 'Formula/opencode-fork.rb')
-          arm64_sha = os.environ.get('SHA256_ARM64', '')
-          x64_sha = os.environ.get('SHA256_X64', '')
+          formula = os.environ['FORMULA']
+          version = os.environ['VERSION']
+          arm64_sha = os.environ['SHA256_ARM64']
+          x64_sha = os.environ['SHA256_X64']
 
           with open(formula) as f:
               content = f.read()
 
-          # Replace sha256 inside on_arm block
+          content = re.sub(r'version "[^"]*"', f'version "{version}"', content, count=1)
           content = re.sub(
-              r'(on_arm\s+do.*?sha256 ")([a-f0-9]{64})(")',
-              lambda m: m.group(1) + arm64_sha + m.group(3),
-              content,
-              flags=re.DOTALL,
+              r'(on_arm\s+do.*?sha256 ")[a-f0-9]{64}(")',
+              lambda m: f'{m.group(1)}{arm64_sha}{m.group(2)}',
+              content, count=1, flags=re.DOTALL,
           )
-
-          # Replace sha256 inside on_intel block
           content = re.sub(
-              r'(on_intel\s+do.*?sha256 ")([a-f0-9]{64})(")',
-              lambda m: m.group(1) + x64_sha + m.group(3),
-              content,
-              flags=re.DOTALL,
+              r'(on_intel\s+do.*?sha256 ")[a-f0-9]{64}(")',
+              lambda m: f'{m.group(1)}{x64_sha}{m.group(2)}',
+              content, count=1, flags=re.DOTALL,
           )
 
           with open(formula, 'w') as f:
               f.write(content)
-
-          print("Updated formula:")
-          print(content)
           EOF
-        env:
-          FORMULA: Formula/opencode-fork.rb
-          SHA256_ARM64: ${{ steps.info.outputs.sha256_arm64 }}
-          SHA256_X64: ${{ steps.info.outputs.sha256_x64 }}
 
       - name: Commit and push
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
         run: |
-          VERSION="${{ steps.info.outputs.version }}"
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/opencode-fork.rb
