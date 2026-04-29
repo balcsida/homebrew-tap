@@ -1,12 +1,24 @@
 # Homebrew Tap
 
-Homebrew tap for my macOS applications.
+Homebrew tap for my macOS applications and CLI tools.
 
 ## Installation
 
 ```bash
 brew tap balcsida/tap
 ```
+
+## Available Formulas
+
+### opencode-fork
+
+CLI build of [opencode](https://opencode.ai) from my fork at [balcsida/opencode](https://github.com/balcsida/opencode), with LiteLLM provider support. Auto-updated on each fork release.
+
+```bash
+brew install balcsida/tap/opencode-fork
+```
+
+Installs an `opencode` binary to `/opt/homebrew/bin`. Tracks `balcsida/opencode` releases (e.g. `v1.14.28-litellm.2`), not the upstream `anomalyco/opencode` build.
 
 ## Available Casks
 
@@ -50,6 +62,7 @@ brew install anyk-25szja
 ## Uninstallation
 
 ```bash
-brew uninstall --cask <cask-name>
+brew uninstall --cask <cask-name>     # for casks
+brew uninstall <formula-name>         # for formulas (e.g. opencode-fork)
 brew untap balcsida/tap
 ```
