@@ -1,18 +1,18 @@
 class OpencodeFork < Formula
   desc "AI-powered development tool (fork with LiteLLM provider support)"
   homepage "https://github.com/balcsida/opencode"
-  version "1.14.41-litellm.1"
+  version "1.15.5-litellm.1"
   license "MIT"
 
   on_macos do
     on_arm do
       url "https://github.com/balcsida/opencode/releases/download/v#{version}/opencode-darwin-arm64.zip"
-      sha256 "102203b682f2572b151d14828d6a93af1fd820f3181b3d03ed7267dfec3ddea1"
+      sha256 "462d8c33b748fcf07d37643798025e50461c7176129db46e0b3a5bce609990a7"
     end
 
     on_intel do
       url "https://github.com/balcsida/opencode/releases/download/v#{version}/opencode-darwin-x64.zip"
-      sha256 "13fac456cc015fad62b82acd5d1164922fb7f462487587c863b94613d2ebf490"
+      sha256 "f9aefc801e6745721b83c8503e4d01394e3e28d24e7abb2bf1bbb49a1bc678d8"
     end
   end
 
