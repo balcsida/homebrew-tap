@@ -7,7 +7,7 @@ cask "zscaler-split-tunnel" do
   desc "Split tunneling for Zscaler on macOS"
   homepage "https://github.com/balcsida/zscaler-split-tunnel"
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "Zscaler Split Tunnel.app"
 end
