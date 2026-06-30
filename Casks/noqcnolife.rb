@@ -8,8 +8,6 @@ cask "noqcnolife" do
   homepage "https://github.com/balcsida/NoQCNoLife"
 
   auto_updates false
-  depends_on macos: ">= :high_sierra"
-
   app "NoQCNoLife.app"
 
   uninstall quit: "io.github.balcsida.NoQCNoLife"
