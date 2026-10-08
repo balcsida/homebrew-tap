@@ -1,8 +1,11 @@
 name: Update graphnest Formula
 
 on:
+  # balcsida/graphnest's Release workflow dispatches this after publishing a release.
+  repository_dispatch:
+    types: [update-graphnest]
   schedule:
-    # graphnest releases don't dispatch here, so check for a new one daily
+    # Fallback in case a dispatch was missed
     - cron: '30 7 * * *'
   workflow_dispatch:
     inputs:
@@ -11,37 +14,63 @@ on:
         required: false
         type: string
 
+concurrency:
+  group: update-graphnest
+  cancel-in-progress: false
+
 jobs:
   update:
-    runs-on: ubuntu-latest
+    # macOS, so the new formula is installed and tested before it is pushed
+    runs-on: macos-latest
     permissions:
       contents: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Update formula
         id: update
         env:
           GH_TOKEN: ${{ github.token }}
+          PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
           INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${INPUT_VERSION:-$(gh api repos/balcsida/graphnest/releases/latest -q '.tag_name')}"
+          VERSION="${PAYLOAD_VERSION:-${INPUT_VERSION:-}}"
+          if [[ -z "$VERSION" ]]; then
+            VERSION=$(gh api repos/balcsida/graphnest/releases/latest -q '.tag_name')
+          fi
           VERSION="${VERSION#v}"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "invalid version: ${VERSION}" >&2; exit 1; }
           # The release publishes SHA-256 sums for its binaries.
           checksums=$(gh release download "v${VERSION}" -R balcsida/graphnest -p "graphnest_${VERSION}_checksums.txt" -O -)
 
-          sed -i "s|/download/v[^/]*/graphnest_[^_]*_|/download/v${VERSION}/graphnest_${VERSION}_|" Formula/graphnest.rb
+          export VERSION
+          perl -0pi -e 's{/download/v[^/]*/graphnest_[^_]*_}{/download/v$ENV{VERSION}/graphnest_$ENV{VERSION}_}g' Formula/graphnest.rb
           for platform in darwin_arm64 darwin_amd64 linux_arm64 linux_amd64; do
-            asset="graphnest_${VERSION}_${platform}"
-            sha=$(awk -v asset="$asset" '$2 == asset { print $1 }' <<<"$checksums")
-            [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "no checksum for ${asset}" >&2; exit 1; }
+            ASSET="graphnest_${VERSION}_${platform}"
+            SHA=$(awk -v asset="$ASSET" '$2 == asset { print $1 }' <<<"$checksums")
+            [[ "$SHA" =~ ^[0-9a-f]{64}$ ]] || { echo "no checksum for ${ASSET}" >&2; exit 1; }
             # Each sha256 line follows the url line of its asset.
-            sed -i "\|/${asset}\"|{n;s/sha256 \"[0-9a-f]*\"/sha256 \"${sha}\"/}" Formula/graphnest.rb
+            ASSET="$ASSET" SHA="$SHA" perl -0pi -e 's{(/\Q$ENV{ASSET}\E"\n\s*sha256 ")[0-9a-f]*"}{$1$ENV{SHA}"}' Formula/graphnest.rb
+            ASSET="$ASSET" SHA="$SHA" perl -0ne 'exit(m{/\Q$ENV{ASSET}\E"\n\s*sha256 "\Q$ENV{SHA}\E"} ? 0 : 1)' Formula/graphnest.rb ||
+              { echo "formula has no url line for ${ASSET}" >&2; exit 1; }
           done
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Audit, install and test
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: |
+          set -euo pipefail
+          # Homebrew audits and installs formulae only from a tap, so test a copy in a scratch one.
+          brew tap-new --no-git balcsida/ci
+          cp Formula/graphnest.rb "$(brew --repository balcsida/ci)/Formula/"
+          brew audit --strict --online balcsida/ci/graphnest
+          brew install balcsida/ci/graphnest
+          brew test balcsida/ci/graphnest
 
       - name: Commit and push
         env:
@@ -55,5 +84,6 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "Update graphnest to v${VERSION}"
+            git pull --rebase
             git push
           fi
