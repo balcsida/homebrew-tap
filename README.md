@@ -20,6 +20,15 @@ brew install balcsida/tap/opencode-fork
 
 Installs an `opencode` binary to `/opt/homebrew/bin`. Tracks `balcsida/opencode` releases (e.g. `v1.14.28-litellm.2`), not the upstream `anomalyco/opencode` build.
 
+### zendesk-cli and zendesk-mcp-server
+
+Unofficial command-line client and Model Context Protocol server for the Zendesk API, from [balcsida/zendesk-rs](https://github.com/balcsida/zendesk-rs). Install either or both. New releases are picked up daily.
+
+```bash
+brew install balcsida/tap/zendesk-cli         # the `zendesk` binary
+brew install balcsida/tap/zendesk-mcp-server  # the `zendesk-mcp-server` binary
+```
+
 ## Available Casks
 
 ### Brain.fm
