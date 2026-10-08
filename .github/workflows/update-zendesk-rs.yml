@@ -1,0 +1,58 @@
+name: Update zendesk-rs Formulae
+
+on:
+  schedule:
+    # zendesk-rs releases don't dispatch here, so check for a new one daily
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without v prefix (e.g. 0.5.0); defaults to the latest release'
+        required: false
+        type: string
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Update formulae
+        id: update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION="${INPUT_VERSION:-$(gh api repos/balcsida/zendesk-rs/releases/latest -q '.tag_name')}"
+          VERSION="${VERSION#v}"
+
+          for bin in zendesk zendesk-mcp-server; do
+            for target in aarch64-apple-darwin x86_64-apple-darwin; do
+              asset="${bin}-${target}.tar.gz"
+              sha=$(curl -fsSL "https://github.com/balcsida/zendesk-rs/releases/download/v${VERSION}/${asset}" | sha256sum | cut -d' ' -f1)
+              # Each sha256 line follows the url line of its asset.
+              sed -i "\|/${asset}\"|{n;s/sha256 \"[0-9a-f]*\"/sha256 \"${sha}\"/}" Formula/zendesk-cli.rb Formula/zendesk-mcp-server.rb
+            done
+          done
+          sed -i "s|/download/v[^/]*/|/download/v${VERSION}/|" Formula/zendesk-cli.rb Formula/zendesk-mcp-server.rb
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        env:
+          VERSION: ${{ steps.update.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/zendesk-cli.rb Formula/zendesk-mcp-server.rb
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update zendesk-rs to v${VERSION}"
+            git push
+          fi
