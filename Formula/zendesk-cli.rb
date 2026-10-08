@@ -5,13 +5,13 @@ class ZendeskCli < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/balcsida/zendesk-rs/releases/download/v0.5.0/zendesk-aarch64-apple-darwin.tar.gz"
-      sha256 "d0a1a3997ee75b3e3fbc36f696bda191302395fa7c44ba882b0fdfbb1b995300"
+      url "https://github.com/balcsida/zendesk-rs/releases/download/v0.6.0/zendesk-aarch64-apple-darwin.tar.gz"
+      sha256 "b502542ae14a6b50afdc5f6209e830c4a354d30744c8554d0f6d84b21e6f035d"
     end
 
     on_intel do
-      url "https://github.com/balcsida/zendesk-rs/releases/download/v0.5.0/zendesk-x86_64-apple-darwin.tar.gz"
-      sha256 "b3a748c90a5005de74fda8293e3dc438aad41f4288a953cc3c68badf11ad86b2"
+      url "https://github.com/balcsida/zendesk-rs/releases/download/v0.6.0/zendesk-x86_64-apple-darwin.tar.gz"
+      sha256 "b7437ec43badff72e6bf2915233c9bbb127f89cfdf9d371ae42f20414e8b9b65"
     end
   end
 
