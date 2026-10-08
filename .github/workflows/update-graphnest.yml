@@ -1,0 +1,59 @@
+name: Update graphnest Formula
+
+on:
+  schedule:
+    # graphnest releases don't dispatch here, so check for a new one daily
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without v prefix (e.g. 0.11.0); defaults to the latest release'
+        required: false
+        type: string
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Update formula
+        id: update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION="${INPUT_VERSION:-$(gh api repos/balcsida/graphnest/releases/latest -q '.tag_name')}"
+          VERSION="${VERSION#v}"
+          # The release publishes SHA-256 sums for its binaries.
+          checksums=$(gh release download "v${VERSION}" -R balcsida/graphnest -p "graphnest_${VERSION}_checksums.txt" -O -)
+
+          sed -i "s|/download/v[^/]*/graphnest_[^_]*_|/download/v${VERSION}/graphnest_${VERSION}_|" Formula/graphnest.rb
+          for platform in darwin_arm64 darwin_amd64 linux_arm64 linux_amd64; do
+            asset="graphnest_${VERSION}_${platform}"
+            sha=$(awk -v asset="$asset" '$2 == asset { print $1 }' <<<"$checksums")
+            [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "no checksum for ${asset}" >&2; exit 1; }
+            # Each sha256 line follows the url line of its asset.
+            sed -i "\|/${asset}\"|{n;s/sha256 \"[0-9a-f]*\"/sha256 \"${sha}\"/}" Formula/graphnest.rb
+          done
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        env:
+          VERSION: ${{ steps.update.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/graphnest.rb
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update graphnest to v${VERSION}"
+            git push
+          fi
