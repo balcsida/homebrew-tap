@@ -7,7 +7,7 @@ cask "brainfm" do
   desc "Native macOS menu bar app for Brain.fm focus music"
   homepage "https://github.com/balcsida/brainfm-swift"
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
   depends_on arch: :arm64
 
   app "BrainFM.app"
