@@ -13,48 +13,33 @@ cask "anyk" do
   # Keep the installer JAR for template installations
   artifact "abevjava_install.jar", target: "#{HOMEBREW_PREFIX}/share/anyk/abevjava_install.jar"
 
-  # JAXB dependencies for Java 21 compatibility
-  jaxb_libs = {
-    "jakarta.xml.bind-api-2.3.3.jar" => "https://repo1.maven.org/maven2/jakarta/xml/bind/jakarta.xml.bind-api/2.3.3/jakarta.xml.bind-api-2.3.3.jar",
-    "jaxb-runtime-2.3.3.jar" => "https://repo1.maven.org/maven2/org/glassfish/jaxb/jaxb-runtime/2.3.3/jaxb-runtime-2.3.3.jar",
-    "jakarta.activation-api-1.2.2.jar" => "https://repo1.maven.org/maven2/jakarta/activation/jakarta.activation-api/1.2.2/jakarta.activation-api-1.2.2.jar",
-    "istack-commons-runtime-3.0.11.jar" => "https://repo1.maven.org/maven2/com/sun/istack/istack-commons-runtime/3.0.11/istack-commons-runtime-3.0.11.jar",
-    "jakarta.activation-1.2.2.jar" => "https://repo1.maven.org/maven2/com/sun/activation/jakarta.activation/1.2.2/jakarta.activation-1.2.2.jar",
-  }
-
-  preflight do
-    # Create installation directories
-    FileUtils.mkdir_p("#{HOMEBREW_PREFIX}/share/abevjava")
-    FileUtils.mkdir_p("#{HOMEBREW_PREFIX}/share/abevjava/lib")
-    FileUtils.mkdir_p("#{HOMEBREW_PREFIX}/etc")
-
-    # Extract application files from installer JAR
-    system_command "/usr/bin/unzip",
-                   args: ["-o", "-q", "#{staged_path}/abevjava_install.jar", "application/*", "-d", staged_path.to_s]
-
-    # Move application files to install directory
-    Dir.glob("#{staged_path}/application/*").each do |f|
-      FileUtils.cp_r(f, "#{HOMEBREW_PREFIX}/share/abevjava/")
-    end
-
-    # Extract macOS app bundle template and icon
-    system_command "/usr/bin/unzip",
-                   args: ["-o", "-q", "#{staged_path}/abevjava_install.jar", "os/install/mac/*", "-d", staged_path.to_s]
+  preflight_steps do
+    # Extract application files and the macOS app bundle template from the installer JAR
+    run "/usr/bin/unzip",
+        args:         ["-o", "-q", "abevjava_install.jar", "application/*", "os/install/mac/*"],
+        chdir:        "{{staged_path}}",
+        must_succeed: false
+    copy "application/.", "share/abevjava", target_base: :homebrew_prefix, recursive: true
 
     # Download JAXB dependencies for Java 21 compatibility
-    jaxb_libs.each do |filename, url|
-      system_command "/usr/bin/curl",
-                     args: ["-sL", "-o", "#{HOMEBREW_PREFIX}/share/abevjava/lib/#{filename}", url]
-    end
+    run "/usr/bin/curl",
+        args:           [
+          "-sL", "--create-dirs", "--remote-name-all",
+          "--output-dir", "{{HOMEBREW_PREFIX}}/share/abevjava/lib",
+          "https://repo1.maven.org/maven2/jakarta/xml/bind/jakarta.xml.bind-api/2.3.3/jakarta.xml.bind-api-2.3.3.jar",
+          "https://repo1.maven.org/maven2/org/glassfish/jaxb/jaxb-runtime/2.3.3/jaxb-runtime-2.3.3.jar",
+          "https://repo1.maven.org/maven2/jakarta/activation/jakarta.activation-api/1.2.2/jakarta.activation-api-1.2.2.jar",
+          "https://repo1.maven.org/maven2/com/sun/istack/istack-commons-runtime/3.0.11/istack-commons-runtime-3.0.11.jar",
+          "https://repo1.maven.org/maven2/com/sun/activation/jakarta.activation/1.2.2/jakarta.activation-1.2.2.jar"
+        ],
+        network_access: true
 
-    # Create abevjavapath.cfg
-    File.write("#{HOMEBREW_PREFIX}/etc/abevjavapath.cfg", "#{HOMEBREW_PREFIX}/share/abevjava")
+    write_file "etc/abevjavapath.cfg", "{{HOMEBREW_PREFIX}}/share/abevjava", base: :homebrew_prefix
   end
 
-  postflight do
+  postflight_steps do
     # Create launcher script
-    launcher_script = "#{HOMEBREW_PREFIX}/bin/anyk"
-    File.write(launcher_script, <<~EOS)
+    write_file "bin/anyk", <<~EOS, base: :homebrew_prefix
       #!/bin/bash
       # ÁNYK Launcher Script
 
@@ -64,8 +49,8 @@ cask "anyk" do
         exit 1
       fi
 
-      ANYK_HOME="#{HOMEBREW_PREFIX}/share/abevjava"
-      ANYK_CONFIG="#{HOMEBREW_PREFIX}/etc/abevjavapath.cfg"
+      ANYK_HOME="{{HOMEBREW_PREFIX}}/share/abevjava"
+      ANYK_CONFIG="{{HOMEBREW_PREFIX}}/etc/abevjavapath.cfg"
       ANYK_LIB="$ANYK_HOME/lib"
       USER_HOME="$HOME"
       USERNAME="$(whoami)"
@@ -111,21 +96,20 @@ ENYK
         -Xbootclasspath/a:"$JAXB_CLASSPATH" \\
         -jar "$ANYK_HOME/abevjava.jar" cfg=cfg.enyk "useroptionfile=$USER_CONFIG"
     EOS
-    FileUtils.chmod(0755, launcher_script)
+    set_permissions "bin/anyk", "0755", base: :homebrew_prefix
 
-    # Create macOS app bundle in ~/Applications
-    app_path = "#{Dir.home}/Applications/ÁNYK.app"
-    FileUtils.mkdir_p("#{app_path}/Contents/MacOS")
-    FileUtils.mkdir_p("#{app_path}/Contents/Resources")
+    # Create macOS app bundle in ~/Applications (the bundle root first, so the sandbox lets steps write inside it)
+    mkdir_p "Applications/ÁNYK.app", base: :home
 
     # Copy icon from extracted files
-    icon_src = "#{staged_path}/os/install/mac/abevjava.app/Contents/Resources/abevjava.icns"
-    if File.exist?(icon_src)
-      FileUtils.cp(icon_src, "#{app_path}/Contents/Resources/anyk.icns")
+    if_path_exists "os/install/mac/abevjava.app/Contents/Resources/abevjava.icns" do
+      copy "os/install/mac/abevjava.app/Contents/Resources/abevjava.icns",
+           "Applications/ÁNYK.app/Contents/Resources/anyk.icns",
+           target_base: :home
     end
 
     # Create Info.plist
-    File.write("#{app_path}/Contents/Info.plist", <<~EOS)
+    write_file "Applications/ÁNYK.app/Contents/Info.plist", <<~EOS, base: :home
       <?xml version="1.0" encoding="UTF-8"?>
       <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
       <plist version="1.0">
@@ -153,11 +137,11 @@ ENYK
     EOS
 
     # Create executable wrapper
-    File.write("#{app_path}/Contents/MacOS/anyk", <<~EOS)
+    write_file "Applications/ÁNYK.app/Contents/MacOS/anyk", <<~EOS, base: :home
       #!/bin/bash
-      exec "#{HOMEBREW_PREFIX}/bin/anyk" "$@"
+      exec "{{HOMEBREW_PREFIX}}/bin/anyk" "$@"
     EOS
-    FileUtils.chmod(0755, "#{app_path}/Contents/MacOS/anyk")
+    set_permissions "Applications/ÁNYK.app/Contents/MacOS/anyk", "0755", base: :home
   end
 
   uninstall delete: [

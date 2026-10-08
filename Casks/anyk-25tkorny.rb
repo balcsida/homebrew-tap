@@ -9,36 +9,17 @@ cask "anyk-25tkorny" do
 
   depends_on cask: "anyk"
 
-  preflight do
-    config_file = "#{HOMEBREW_PREFIX}/etc/abevjavapath.cfg"
-    unless File.exist?(config_file)
-      odie "ÁNYK is not installed. Please install it first with: brew install --cask anyk"
-    end
-
-    system_command "/usr/bin/unzip",
-                   args: ["-o", "-q", "#{staged_path}/nav_25tkorny.jar", "application/*", "-d", staged_path.to_s],
-                   print_stderr: false
-
-    anyk_dir = File.read(config_file).strip
-
-    Dir.glob("#{staged_path}/application/**/*").each do |src|
-      next if File.directory?(src)
-
-      relative_path = src.sub("#{staged_path}/application/", "")
-      dest = File.join(anyk_dir, relative_path)
-      FileUtils.mkdir_p(File.dirname(dest))
-      FileUtils.cp(src, dest)
-    end
+  preflight_steps do
+    run "/usr/bin/unzip",
+        args:         ["-o", "-q", "nav_25tkorny.jar", "application/*"],
+        chdir:        "{{staged_path}}",
+        must_succeed: false,
+        print_stderr: false
+    copy "application/.", "share/abevjava", target_base: :homebrew_prefix, recursive: true
   end
 
-  uninstall_preflight do
-    config_file = "#{HOMEBREW_PREFIX}/etc/abevjavapath.cfg"
-    if File.exist?(config_file)
-      anyk_dir = File.read(config_file).strip
-      Dir.glob("#{anyk_dir}/nyomtatvanyok/*25TKORNY*.tem.enyk").each do |f|
-        FileUtils.rm_f(f)
-      end
-    end
+  uninstall_preflight_steps do
+    remove "share/abevjava/nyomtatvanyok/*25TKORNY*.tem.enyk", base: :homebrew_prefix
   end
 
   caveats <<~EOS
