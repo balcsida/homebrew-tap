@@ -2,8 +2,8 @@ name: Update zendesk-rs Formulae
 
 on:
   schedule:
-    # zendesk-rs releases don't dispatch here, so check for a new one daily
-    - cron: '0 7 * * *'
+    # zendesk-rs releases don't dispatch here, so check for a new one hourly
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       version:
@@ -30,6 +30,11 @@ jobs:
           set -euo pipefail
           VERSION="${INPUT_VERSION:-$(gh api repos/balcsida/zendesk-rs/releases/latest -q '.tag_name')}"
           VERSION="${VERSION#v}"
+          # Already current: skip the downloads, which GitHub counts.
+          if grep -qF "/download/v${VERSION}/" Formula/zendesk-cli.rb; then
+            echo "Formulae already at v${VERSION}"
+            exit 0
+          fi
 
           for bin in zendesk zendesk-mcp-server; do
             for target in aarch64-apple-darwin x86_64-apple-darwin; do
