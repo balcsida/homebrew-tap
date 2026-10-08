@@ -29,6 +29,14 @@ brew install balcsida/tap/zendesk-cli         # the `zendesk` binary
 brew install balcsida/tap/zendesk-mcp-server  # the `zendesk-mcp-server` binary
 ```
 
+### graphnest
+
+Command-line tool for [GraphNest](https://github.com/balcsida/graphnest): imports an existing CodeGraph index, checks it against the commit and publishes it to a GraphNest server. `graphnest login` signs in to the server through the browser. Prebuilt for macOS and Linux; new releases are picked up daily.
+
+```bash
+brew install balcsida/tap/graphnest
+```
+
 ## Available Casks
 
 ### Brain.fm
