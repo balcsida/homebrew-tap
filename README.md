@@ -37,6 +37,16 @@ Command-line tool for [GraphNest](https://github.com/balcsida/graphnest): import
 brew install balcsida/tap/graphnest
 ```
 
+### teams-cli
+
+Pre-release build of the Microsoft Teams CLI from my fork at [balcsida/ms-teams-cli](https://github.com/balcsida/ms-teams-cli), carrying the configurable `--redirect-uri` browser login ([osodevops/ms-teams-cli#125](https://github.com/osodevops/ms-teams-cli/pull/125)) until it ships upstream. macOS only.
+
+```bash
+brew install balcsida/tap/teams-cli
+```
+
+Installs the `teams` binary and its man pages. The same formula name exists in `osodevops/tap`, so use the fully-qualified name. Once an upstream release includes the feature, switch back with `brew uninstall balcsida/tap/teams-cli && brew install osodevops/tap/teams-cli`.
+
 ## Available Casks
 
 ### Brain.fm
