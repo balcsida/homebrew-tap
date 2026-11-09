@@ -5,13 +5,13 @@ class ZendeskMcpServer < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/balcsida/zendesk-rs/releases/download/v0.6.0/zendesk-mcp-server-aarch64-apple-darwin.tar.gz"
-      sha256 "97d61c6703a6da781762803413aad30a234686feafe02b48acfe7e62495832b8"
+      url "https://github.com/balcsida/zendesk-rs/releases/download/v0.7.0/zendesk-mcp-server-aarch64-apple-darwin.tar.gz"
+      sha256 "3a78ac6b1ef46215917b31270f1a8cb24d78a8d8ae12db170a1fbca85c5f3d48"
     end
 
     on_intel do
-      url "https://github.com/balcsida/zendesk-rs/releases/download/v0.6.0/zendesk-mcp-server-x86_64-apple-darwin.tar.gz"
-      sha256 "361741d2339f33f1ad51cf5d3dfdbd2ea0b74a40e9e80a60b7a43daadf388272"
+      url "https://github.com/balcsida/zendesk-rs/releases/download/v0.7.0/zendesk-mcp-server-x86_64-apple-darwin.tar.gz"
+      sha256 "af3fedfe77526a34eeb967a00a08891b051c3ff5b5b071790ee389da580e3a5b"
     end
   end
 
