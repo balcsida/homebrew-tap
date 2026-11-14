@@ -5,25 +5,25 @@ class Graphnest < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/balcsida/graphnest/releases/download/v0.11.0/graphnest_0.11.0_darwin_arm64"
-      sha256 "ce7dc807523c0d2f18b2e48abb2384e6b4bd34820e927bc1fdd7f117f7b8cd8a"
+      url "https://github.com/balcsida/graphnest/releases/download/v0.12.0/graphnest_0.12.0_darwin_arm64"
+      sha256 "c732a5bce2990b0f0a9f3f36086f5c78127cc8e16547bb481e133161003de4c6"
     end
 
     on_intel do
-      url "https://github.com/balcsida/graphnest/releases/download/v0.11.0/graphnest_0.11.0_darwin_amd64"
-      sha256 "a37ceba7264ce2665b3687760d8c93d66b1bdb67abf7d26c19c8a2e6bc8a62e2"
+      url "https://github.com/balcsida/graphnest/releases/download/v0.12.0/graphnest_0.12.0_darwin_amd64"
+      sha256 "0b898c7bdd3bba39bd7c9e2cf9ca1287d7104759ce914f7338f0870a8ba9959c"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/balcsida/graphnest/releases/download/v0.11.0/graphnest_0.11.0_linux_arm64"
-      sha256 "1b6065b58b0481e4b55756ed9d16c67cabedee3d5ff6e4091cb4caca9e130461"
+      url "https://github.com/balcsida/graphnest/releases/download/v0.12.0/graphnest_0.12.0_linux_arm64"
+      sha256 "d930dbfd4c172008936a211f3d8c9a44f45e3e9dea40548d13f4defaf8a61653"
     end
 
     on_intel do
-      url "https://github.com/balcsida/graphnest/releases/download/v0.11.0/graphnest_0.11.0_linux_amd64"
-      sha256 "c5c837b807e9dd1bacb7de5e4e76a179446185ee9377f57c6051ed0adb5c8ce6"
+      url "https://github.com/balcsida/graphnest/releases/download/v0.12.0/graphnest_0.12.0_linux_amd64"
+      sha256 "811af54bba33ac4681b8e01c1e34b8b29c35185dd5d853d4dd99bd32dde81cfd"
     end
   end
 
