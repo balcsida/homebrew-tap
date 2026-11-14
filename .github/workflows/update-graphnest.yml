@@ -67,6 +67,8 @@ jobs:
           set -euo pipefail
           # Homebrew audits and installs formulae only from a tap, so test a copy in a scratch one.
           brew tap-new --no-git balcsida/ci
+          # Homebrew refuses to load formulae from a tap it was not told to trust.
+          brew trust balcsida/ci
           cp Formula/graphnest.rb "$(brew --repository balcsida/ci)/Formula/"
           brew audit --strict --online balcsida/ci/graphnest
           brew install balcsida/ci/graphnest
