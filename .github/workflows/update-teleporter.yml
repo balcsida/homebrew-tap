@@ -1,0 +1,90 @@
+name: Update Teleporter Cask
+
+on:
+  # balcsida/teleporter's release workflow dispatches this after publishing a release.
+  repository_dispatch:
+    types: [update-teleporter]
+  schedule:
+    # Fallback in case a dispatch was missed
+    - cron: '40 7 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without v prefix (e.g. 0.2.0); defaults to the latest release'
+        required: false
+        type: string
+
+concurrency:
+  group: update-teleporter
+  cancel-in-progress: false
+
+jobs:
+  update:
+    # macOS, so the new cask is installed before it is pushed
+    runs-on: macos-latest
+    # A Gatekeeper prompt would wait forever on a headless runner.
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Update cask
+        id: update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION="${PAYLOAD_VERSION:-${INPUT_VERSION:-}}"
+          if [[ -z "$VERSION" ]]; then
+            VERSION=$(gh api repos/balcsida/teleporter/releases/latest -q '.tag_name')
+          fi
+          VERSION="${VERSION#v}"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "invalid version: ${VERSION}" >&2; exit 1; }
+          ZIP="Teleporter-${VERSION}.zip"
+          gh release download "v${VERSION}" -R balcsida/teleporter -p "$ZIP" -D "$RUNNER_TEMP"
+          # Only a zip that balcsida/teleporter's release workflow built goes into the cask.
+          gh attestation verify "$RUNNER_TEMP/$ZIP" --repo balcsida/teleporter
+          SHA=$(shasum -a 256 "$RUNNER_TEMP/$ZIP" | awk '{print $1}')
+
+          sed -i '' -E "s/^  version \".*\"/  version \"${VERSION}\"/; s/^  sha256 \".*\"/  sha256 \"${SHA}\"/" Casks/teleporter.rb
+          grep -q "version \"${VERSION}\"" Casks/teleporter.rb && grep -q "sha256 \"${SHA}\"" Casks/teleporter.rb
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Audit and install
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: |
+          set -euo pipefail
+          # Homebrew audits and installs casks only from a tap, so test a copy in a scratch one.
+          brew tap-new --no-git balcsida/ci
+          # Homebrew refuses to load casks from a tap it was not told to trust.
+          brew trust balcsida/ci
+          mkdir -p "$(brew --repository balcsida/ci)/Casks"
+          cp Casks/teleporter.rb "$(brew --repository balcsida/ci)/Casks/"
+          brew audit --strict --online --cask balcsida/ci/teleporter
+          brew install --cask balcsida/ci/teleporter
+          # What the caveat tells users to do; without it the smoke test could meet a Gatekeeper prompt.
+          xattr -dr com.apple.quarantine /Applications/Teleporter.app
+          teleporter status
+
+      - name: Commit and push
+        env:
+          VERSION: ${{ steps.update.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/teleporter.rb
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update Teleporter to v${VERSION}"
+            git pull --rebase
+            git push
+          fi

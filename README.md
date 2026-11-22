@@ -69,6 +69,18 @@ brew install noqcnolife
 
 - [NoQCNoLife Repository](https://github.com/balcsida/NoQCNoLife)
 
+### Teleporter
+
+A UniFi Teleport client that routes only your console's networks through the tunnel, as a menu bar app with the `teleporter` command. Updated on each Teleporter release after an install test on macOS.
+
+```bash
+brew install --cask balcsida/tap/teleporter
+```
+
+The app is ad-hoc signed, not notarized; the cask's caveats say how to allow it past Gatekeeper.
+
+- [Teleporter Repository](https://github.com/balcsida/teleporter)
+
 ### ANYK
 
 Hungarian Tax Authority (NAV) form filler application for macOS.
