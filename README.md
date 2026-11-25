@@ -10,16 +10,6 @@ brew tap balcsida/tap
 
 ## Available Formulas
 
-### opencode-fork
-
-CLI build of [opencode](https://opencode.ai) from my fork at [balcsida/opencode](https://github.com/balcsida/opencode), with LiteLLM provider support. Auto-updated on each fork release.
-
-```bash
-brew install balcsida/tap/opencode-fork
-```
-
-Installs an `opencode` binary to `/opt/homebrew/bin`. Tracks `balcsida/opencode` releases (e.g. `v1.14.28-litellm.2`), not the upstream `anomalyco/opencode` build.
-
 ### zendesk-cli and zendesk-mcp-server
 
 Unofficial command-line client and Model Context Protocol server for the Zendesk API, from [balcsida/zendesk-rs](https://github.com/balcsida/zendesk-rs). Install either or both. New releases are picked up daily.
@@ -102,6 +92,6 @@ brew install anyk-25szja
 
 ```bash
 brew uninstall --cask <cask-name>     # for casks
-brew uninstall <formula-name>         # for formulas (e.g. opencode-fork)
+brew uninstall <formula-name>         # for formulas (e.g. zendesk-cli)
 brew untap balcsida/tap
 ```
