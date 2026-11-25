@@ -22,7 +22,7 @@ Installs an `opencode` binary to `/opt/homebrew/bin`. Tracks `balcsida/opencode`
 
 ### zendesk-cli and zendesk-mcp-server
 
-Unofficial command-line client and Model Context Protocol server for the Zendesk API, from [balcsida/zendesk-rs](https://github.com/balcsida/zendesk-rs). Install either or both. New releases are picked up daily.
+Unofficial command-line client and Model Context Protocol server for the Zendesk API, from [balcsida/zendesk-rs](https://github.com/balcsida/zendesk-rs). Install either or both. Updated as each release is published.
 
 ```bash
 brew install balcsida/tap/zendesk-cli         # the `zendesk` binary
