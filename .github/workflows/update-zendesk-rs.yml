@@ -1,9 +1,9 @@
 name: Update zendesk-rs Formulae
 
 on:
-  schedule:
-    # zendesk-rs releases don't dispatch here, so check for a new one hourly
-    - cron: '17 * * * *'
+  # balcsida/zendesk-rs's release workflow dispatches this after publishing a release.
+  repository_dispatch:
+    types: [update-zendesk-rs]
   workflow_dispatch:
     inputs:
       version:
@@ -25,11 +25,16 @@ jobs:
         id: update
         env:
           GH_TOKEN: ${{ github.token }}
+          PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
           INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${INPUT_VERSION:-$(gh api repos/balcsida/zendesk-rs/releases/latest -q '.tag_name')}"
+          VERSION="${PAYLOAD_VERSION:-${INPUT_VERSION:-}}"
+          if [[ -z "$VERSION" ]]; then
+            VERSION=$(gh api repos/balcsida/zendesk-rs/releases/latest -q '.tag_name')
+          fi
           VERSION="${VERSION#v}"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "invalid version: ${VERSION}" >&2; exit 1; }
           # Already current: skip the downloads, which GitHub counts.
           if grep -qF "/download/v${VERSION}/" Formula/zendesk-cli.rb; then
             echo "Formulae already at v${VERSION}"

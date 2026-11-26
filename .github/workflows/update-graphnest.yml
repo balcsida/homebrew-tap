@@ -4,9 +4,6 @@ on:
   # balcsida/graphnest's Release workflow dispatches this after publishing a release.
   repository_dispatch:
     types: [update-graphnest]
-  schedule:
-    # Fallback in case a dispatch was missed
-    - cron: '30 7 * * *'
   workflow_dispatch:
     inputs:
       version:
