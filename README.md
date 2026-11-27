@@ -37,6 +37,15 @@ brew install balcsida/tap/teams-cli
 
 Installs the `teams` binary and its man pages. The same formula name exists in `osodevops/tap`, so use the fully-qualified name. Once an upstream release includes the feature, switch back with `brew uninstall balcsida/tap/teams-cli && brew install osodevops/tap/teams-cli`.
 
+### teams-now-playing
+
+Shows the track playing in Apple Music as your Microsoft Teams status message, from [balcsida/teams-now-playing](https://github.com/balcsida/teams-now-playing). Needs an authenticated [`teams` CLI](https://github.com/osodevops/ms-teams-cli) on the PATH. macOS only.
+
+```bash
+brew install balcsida/tap/teams-now-playing
+brew services start teams-now-playing
+```
+
 ## Available Casks
 
 ### Brain.fm
